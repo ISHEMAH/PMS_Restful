@@ -1,0 +1,168 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  USER
+  ADMIN
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  password  String
+  name      String
+  role      Role     @default(USER)
+  vehicles  Vehicle[]
+  bookings  Booking[]
+  auditLogs AuditLog[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Vehicle {
+  id          String   @id @default(uuid())
+  plateNumber String   @unique
+  type        VehicleType
+  owner       User     @relation(fields: [ownerId], references: [id])
+  ownerId     String
+  slot        Slot?    @relation(fields: [slotId], references: [id])
+  slotId      Int?     @unique
+  checkIn     DateTime?
+  checkOut    DateTime?
+  paid        Boolean  @default(false)
+  bookings    Booking[]
+  auditLogs   AuditLog[]
+}
+
+enum SlotStatus {
+  AVAILABLE
+  OCCUPIED
+  MAINTENANCE
+}
+
+enum VehicleType {
+  CAR
+  MOTORCYCLE
+  BIKE
+}
+
+enum AuditAction {
+  CREATE
+  UPDATE
+  DELETE
+  APPROVE
+  REJECT
+}
+
+enum BookingStatus {
+  PENDING
+  APPROVED
+  DECLINED
+  CHECKED_OUT
+  CANCELLED
+}
+
+model Slot {
+  id        Int      @id @default(autoincrement())
+  number    Int      @unique
+  type      VehicleType
+  status    SlotStatus @default(AVAILABLE)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  Booking   Booking[]
+  Vehicle   Vehicle?
+  analytics Analytics[]
+}
+
+model Booking {
+  id            String   @id @default(uuid())
+  user          User     @relation(fields: [userId], references: [id])
+  userId        String
+
+  vehicle       Vehicle  @relation(fields: [vehicleId], references: [id])
+  vehicleId     String
+
+  slot          Slot?    @relation(fields: [slotId], references: [id])
+  slotId        Int?
+
+  status        BookingStatus @default(PENDING)
+  entryTime     DateTime?
+  checkoutTime  DateTime?
+  paymentStatus PaymentStatus @default(PENDING)
+  amount        Float?
+  paymentMethod PaymentMethod?
+
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  // Relations
+  analytics     Analytics[]
+  auditLogs     AuditLog[]
+}
+
+model Analytics {
+  id            String   @id @default(cuid())
+  date          DateTime
+  totalBookings Int
+  totalRevenue  Float
+  occupancyRate Float
+  averageStay   Float
+  peakHours     String
+  vehicleTypeStats VehicleTypeStats[]
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  // Relations
+  bookings Booking[]
+  slots    Slot[]
+}
+
+model VehicleTypeStats {
+  id            String   @id @default(cuid())
+  analytics     Analytics @relation(fields: [analyticsId], references: [id])
+  analyticsId   String
+  type          String
+  count         Int
+  percentage    Float
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model AuditLog {
+  id        String   @id @default(uuid())
+  action    AuditAction
+  entityType String
+  entityId   String
+  userId     String
+  user       User     @relation(fields: [userId], references: [id])
+  oldValue  Json?
+  newValue  Json?
+  createdAt DateTime @default(now())
+
+  // Relations
+  booking   Booking? @relation(fields: [bookingId], references: [id])
+  bookingId String?
+  vehicle   Vehicle? @relation(fields: [vehicleId], references: [id])
+  vehicleId String?
+}
+
+
+
+enum PaymentStatus {
+  PENDING
+  PAID
+  UNPAID
+}
+enum PaymentMethod {
+  CASH
+  CARD
+  ONLINE
+}
