@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+
+import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { vehicleApi } from "@/lib/api-client";
 import { toast } from "sonner";
@@ -57,7 +58,6 @@ import { Badge } from "@/components/ui/badge";
 import PageTransition from "@/components/layout/PageTransition";
 import { Car, Plus, Edit, Trash, Loader2 } from "lucide-react";
 import { VehicleType, CreateVehicle, UpdateVehicle } from "@/lib/types";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 // Vehicle form schema
 const vehicleFormSchema = z.object({
@@ -67,19 +67,12 @@ const vehicleFormSchema = z.object({
 
 type VehicleFormValues = z.infer<typeof vehicleFormSchema>;
 
-interface Vehicle {
-  id: string;
-  plateNumber: string;
-  type: string;
-  model: string;
-}
-
 export default function UserVehicles() {
   const queryClient = useQueryClient();
   const [openAddDialog, setOpenAddDialog] = useState(false);
   const [openEditDialog, setOpenEditDialog] = useState(false);
-  const [currentVehicle, setCurrentVehicle] = useState<Vehicle | null>(null);
-  const [deleteVehicle, setDeleteVehicle] = useState<Vehicle | null>(null);
+  const [currentVehicle, setCurrentVehicle] = useState<any | null>(null);
+  const [deleteVehicle, setDeleteVehicle] = useState<any | null>(null);
   
   // Create form
   const addForm = useForm<VehicleFormValues>({
@@ -167,11 +160,11 @@ export default function UserVehicles() {
   };
   
   // Handle edit button click
-  const handleEdit = (vehicle: Vehicle) => {
+  const handleEdit = (vehicle: any) => {
     setCurrentVehicle(vehicle);
     editForm.reset({
       plateNumber: vehicle.plateNumber,
-      type: vehicle.type as VehicleType,
+      type: vehicle.type,
     });
     setOpenEditDialog(true);
   };
@@ -207,45 +200,73 @@ export default function UserVehicles() {
         </div>
 
         {isLoading ? (
-          <div className="flex items-center justify-center py-8">
-            <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {Array.from({ length: 3 }).map((_, index) => (
+              <Card key={index} className="animate-pulse">
+                <CardHeader className="space-y-2">
+                  <div className="h-4 bg-gray-200 rounded w-3/4"></div>
+                  <div className="h-3 bg-gray-200 rounded w-1/2"></div>
+                </CardHeader>
+                <CardContent>
+                  <div className="h-4 bg-gray-200 rounded w-1/3 mb-2"></div>
+                </CardContent>
+                <CardFooter>
+                  <div className="h-9 bg-gray-200 rounded w-full"></div>
+                </CardFooter>
+              </Card>
+            ))}
           </div>
         ) : vehicles && vehicles.length > 0 ? (
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Plate Number</TableHead>
-                <TableHead>Type</TableHead>
-                <TableHead>Model</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {vehicles.map((vehicle) => (
-                <TableRow key={vehicle.id}>
-                  <TableCell>{vehicle.plateNumber}</TableCell>
-                  <TableCell>{getVehicleBadge(vehicle.type as VehicleType)}</TableCell>
-                  <TableCell>{vehicle.model || "N/A"}</TableCell>
-                  <TableCell className="text-right">
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {vehicles.map((vehicle) => (
+              <motion.div
+                key={vehicle.id}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.3 }}
+              >
+                <Card>
+                  <CardHeader>
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <CardTitle className="text-xl">{vehicle.plateNumber}</CardTitle>
+                        <CardDescription>
+                          Added on {new Date(vehicle.createdAt).toLocaleDateString()}
+                        </CardDescription>
+                      </div>
+                      {getVehicleBadge(vehicle.type as VehicleType)}
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="flex items-center">
+                      <Car className="h-5 w-5 text-gray-500 mr-2" />
+                      <span className="text-sm text-gray-600">{vehicle.type}</span>
+                    </div>
+                  </CardContent>
+                  <CardFooter className="flex justify-between">
                     <Button
-                      variant="ghost"
+                      variant="outline"
                       size="sm"
                       onClick={() => handleEdit(vehicle)}
                     >
-                      <Edit className="h-4 w-4" />
+                      <Edit className="h-4 w-4 mr-2" />
+                      Edit
                     </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => setDeleteVehicle(vehicle)}
-                    >
-                      <Trash className="h-4 w-4" />
-                    </Button>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+                    <AlertDialogTrigger asChild>
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        onClick={() => setDeleteVehicle(vehicle)}
+                      >
+                        <Trash className="h-4 w-4 mr-2" />
+                        Delete
+                      </Button>
+                    </AlertDialogTrigger>
+                  </CardFooter>
+                </Card>
+              </motion.div>
+            ))}
+          </div>
         ) : (
           <Card>
             <CardContent className="flex flex-col items-center justify-center py-10">

@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { bookingApi } from "@/lib/api-client";
@@ -182,31 +183,57 @@ export default function UserBookings() {
             </div>
 
             {isLoading ? (
-              <div className="flex items-center justify-center py-8">
-                <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
+              <div className="animate-pulse space-y-4">
+                <div className="h-10 bg-gray-200 rounded w-full"></div>
+                <div className="h-10 bg-gray-200 rounded w-full"></div>
+                <div className="h-10 bg-gray-200 rounded w-full"></div>
               </div>
             ) : filteredBookings.length > 0 ? (
               <div className="rounded-md border">
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Parking</TableHead>
-                      <TableHead>Slot</TableHead>
-                      <TableHead>Start Time</TableHead>
-                      <TableHead>End Time</TableHead>
+                      <TableHead>Vehicle</TableHead>
+                      <TableHead className="hidden md:table-cell">Location</TableHead>
+                      <TableHead className="hidden lg:table-cell">Date</TableHead>
                       <TableHead>Status</TableHead>
-                      <TableHead>Payment</TableHead>
+                      <TableHead className="hidden sm:table-cell">Payment</TableHead>
+                      <TableHead className="text-right">Action</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {filteredBookings.map((booking) => (
                       <TableRow key={booking.id}>
-                        <TableCell>{booking.slot.parking.name}</TableCell>
-                        <TableCell>{booking.slot.number}</TableCell>
-                        <TableCell>{format(new Date(booking.startTime), "MMM d, h:mm a")}</TableCell>
-                        <TableCell>{format(new Date(booking.endTime), "MMM d, h:mm a")}</TableCell>
-                        <TableCell>{getStatusBadge(booking.status)}</TableCell>
-                        <TableCell>{getPaymentStatusBadge(booking.paymentStatus)}</TableCell>
+                        <TableCell>
+                          <div className="font-medium">
+                            {booking.vehicle?.plateNumber || "Unknown Vehicle"}
+                          </div>
+                          <div className="text-sm text-gray-500 md:hidden">
+                            {booking.slot?.parking?.name || "Unknown Parking"}
+                          </div>
+                        </TableCell>
+                        <TableCell className="hidden md:table-cell">
+                          {booking.slot?.parking?.name || "Unknown Parking"}
+                        </TableCell>
+                        <TableCell className="hidden lg:table-cell">
+                          {format(new Date(booking.entryTime), "MMM d, yyyy")}
+                        </TableCell>
+                        <TableCell>
+                          {getStatusBadge(booking.status)}
+                          <div className="text-sm text-gray-500 sm:hidden mt-1">
+                            {getPaymentStatusBadge(booking.paymentStatus)}
+                          </div>
+                        </TableCell>
+                        <TableCell className="hidden sm:table-cell">
+                          {getPaymentStatusBadge(booking.paymentStatus)}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Link to={`/dashboard/bookings/${booking.id}`}>
+                            <Button variant="outline" size="sm">
+                              Details
+                            </Button>
+                          </Link>
+                        </TableCell>
                       </TableRow>
                     ))}
                   </TableBody>

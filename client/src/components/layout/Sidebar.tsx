@@ -1,3 +1,4 @@
+
 import { Link, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { useAuthStore } from "@/lib/auth-store";
@@ -47,14 +48,6 @@ export default function Sidebar({ isOpen, onToggle }: SidebarProps) {
         { name: "Profile", href: "/dashboard/profile", icon: User },
       ];
 
-  // Check if a route is active, including nested routes
-  const isRouteActive = (href: string) => {
-    if (href === basePath) {
-      return pathname === href;
-    }
-    return pathname.startsWith(href);
-  };
-
   return (
     <motion.div
       initial={false}
@@ -82,7 +75,7 @@ export default function Sidebar({ isOpen, onToggle }: SidebarProps) {
       <div className="flex-1 py-6 flex flex-col justify-between">
         <nav className="px-2 space-y-1">
           {navigation.map((item) => {
-            const isActive = isRouteActive(item.href);
+            const isActive = pathname === item.href;
             return (
               <Link
                 key={item.name}

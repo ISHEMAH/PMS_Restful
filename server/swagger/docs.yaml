@@ -942,8 +942,8 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                properties:
+      type: object
+      properties:
                   reports:
                     type: array
                     items:
@@ -1096,17 +1096,17 @@ paths:
         - name: startDate
           in: query
           schema:
-            type: string
+          type: string
             format: date-time
         - name: endDate
           in: query
           schema:
-            type: string
+          type: string
             format: date-time
         - name: parkingId
           in: query
           schema:
-            type: string
+          type: string
       responses:
         '200':
           description: Peak hours data

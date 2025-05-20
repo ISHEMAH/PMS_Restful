@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { bookingApi } from "@/lib/api-client";
 import { format } from "date-fns";
@@ -53,18 +53,6 @@ const statusFilters = [
   { label: "Cancelled", value: "CANCELLED" },
 ];
 
-interface ParkingHistory {
-  id: string;
-  entryTime: string;
-  exitTime: string;
-  duration: number;
-  fee: number;
-  parking: {
-    name: string;
-    location: string;
-  };
-}
-
 export default function ParkingHistory() {
   // State for filters
   const [searchQuery, setSearchQuery] = useState("");
@@ -73,7 +61,6 @@ export default function ParkingHistory() {
     from: undefined,
     to: undefined,
   });
-  const [history, setHistory] = useState<ParkingHistory[]>([]);
 
   // Fetch booking history
   const {
@@ -86,19 +73,6 @@ export default function ParkingHistory() {
     queryKey: ["bookingHistory", statusFilter, dateRange],
     queryFn: () => bookingApi.getHistory(dateRange?.from?.toISOString(), dateRange?.to?.toISOString()),
   });
-
-  useEffect(() => {
-    const fetchHistory = async () => {
-      try {
-        const data = await bookingApi.getHistory();
-        setHistory(data);
-      } catch (error) {
-        console.error('Error fetching parking history:', error);
-      }
-    };
-
-    fetchHistory();
-  }, []);
 
   // Filter bookings based on search query
   const filteredBookings = bookings

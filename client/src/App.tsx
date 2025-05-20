@@ -21,7 +21,6 @@ import CreateBooking from "./pages/dashboard/CreateBooking";
 import BookingDetails from "./pages/dashboard/BookingDetails";
 import UserProfile from "./pages/dashboard/UserProfile";
 import ParkingHistory from "./pages/dashboard/ParkingHistory";
-import Payments from "./pages/dashboard/Payments";
 
 // Admin Dashboard Pages
 import AdminDashboard from "./pages/admin/AdminDashboard";
@@ -92,7 +91,7 @@ const App = () => (
             <Route path="vehicles" element={<UserVehicles />} />
             <Route path="history" element={<ParkingHistory />} />
             <Route path="profile" element={<UserProfile />} />
-            <Route path="payments" element={<Payments />} />
+            <Route path="payments" element={<ParkingHistory />} /> {/* Temporarily using ParkingHistory as a placeholder */}
           </Route>
           
           {/* Admin Dashboard Routes */}
