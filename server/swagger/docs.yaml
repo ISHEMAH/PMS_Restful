@@ -942,8 +942,8 @@ paths:
           content:
             application/json:
               schema:
-      type: object
-      properties:
+                type: object
+                properties:
                   reports:
                     type: array
                     items:

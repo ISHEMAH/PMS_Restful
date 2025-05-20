@@ -8,6 +8,10 @@ import { prisma } from './types/prisma';
 import swaggerUi from 'swagger-ui-express';
 import YAML from 'yamljs';
 import path from 'path';
+import dotenv from 'dotenv';
+
+// Load environment variables from .env file
+dotenv.config({ path: path.join(__dirname, '../.env') });
 
 // Import routes
 import authRoutes from './routes/auth.routes';
@@ -18,6 +22,7 @@ import checkoutRoutes from './routes/checkout.routes';
 import ticketRoutes from './routes/ticket.routes';
 import analyticsRoutes from './routes/analytics.routes';
 import reportRoutes from './routes/report.routes';
+import adminRoutes from './routes/admin.routes';
 
 const app = express();
 
@@ -66,6 +71,7 @@ app.use('/api/v1/checkout', checkoutRoutes);
 app.use('/api/v1/tickets', ticketRoutes);
 app.use('/api/v1/analytics', analyticsRoutes);
 app.use('/api/v1/reports', reportRoutes);
+app.use('/api/v1/admin', adminRoutes);
 
 // Error handling middleware
 app.use((err: Error, req: express.Request, res: express.Response, next: express.NextFunction) => {
