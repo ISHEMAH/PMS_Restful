@@ -1,16 +1,16 @@
 import { Router } from 'express';
 import { createVehicle, getVehicles, updateVehicle, deleteVehicle } from '../controllers/vehicle.controller';
-import protect from '../middleware/auth';
+import { authenticateToken } from '../middleware/auth';
 
 const router = Router();
 
 // Protected routes
-// router.use(protect);
+router.use(authenticateToken);
 
 // Vehicle routes
-router.post('/', protect, createVehicle);
-router.get('/', protect, getVehicles);
-router.patch('/:id', protect, updateVehicle);
-router.delete('/:id', protect, deleteVehicle);
+router.post('/', createVehicle);
+router.get('/', getVehicles);
+router.patch('/:id', updateVehicle);
+router.delete('/:id', deleteVehicle);
 
 export default router;

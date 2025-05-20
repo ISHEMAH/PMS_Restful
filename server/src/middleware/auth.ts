@@ -1,60 +1,77 @@
 import jwt from 'jsonwebtoken';
-import { RequestHandler, Request, Response, NextFunction } from 'express';
-import { verify } from 'jsonwebtoken';
-import { User } from '../types/user';
+import { Request, Response, NextFunction } from 'express';
 import { prisma } from '../types/prisma';
 
-export interface AuthenticatedRequest extends Request {
-  user?: User;
+// Extend Express Request type to include user
+declare global {
+  namespace Express {
+    interface Request {
+      user?: {
+        id: string;
+        role: string;
+      };
+    }
+  }
 }
 
-export const protect: RequestHandler = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+export const validateAdminKey = (req: Request, res: Response, next: NextFunction) => {
+  const adminKey = req.headers['x-admin-key'];
+  console.log('Received admin key:', adminKey);
+  console.log('Expected admin key:', process.env.ADMIN_KEY);
+  console.log('All env vars:', process.env);
+
+  if (!adminKey || adminKey !== process.env.ADMIN_KEY) {
+    return res.status(401).json({ error: 'Invalid admin key' });
+  }
+
+  next();
+};
+
+export const authenticateToken = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const token = req.headers.authorization?.split(' ')[1];
+    const authHeader = req.headers['authorization'];
+    const token = authHeader && authHeader.split(' ')[1];
+
     if (!token) {
-      res.status(401).json({ error: 'Not authorized to access this route' });
-      return;
+      return res.status(401).json({ error: 'Authentication token required' });
     }
 
-    const decoded = verify(token, process.env.JWT_SECRET!);
-    if (!decoded || typeof decoded !== 'object' || !('id' in decoded)) {
-      res.status(401).json({ error: 'Invalid token' });
-      return;
-    }
+    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key') as {
+      id: string;
+      role: string;
+    };
 
+    // Verify user still exists
     const user = await prisma.user.findUnique({
-      where: { id: decoded.id },
-      select: { id: true, email: true, name: true, role: true }
+      where: { id: decoded.id }
     });
 
     if (!user) {
-      res.status(401).json({ error: 'User not found' });
-      return;
+      return res.status(401).json({ error: 'User no longer exists' });
     }
 
-    (req as AuthenticatedRequest).user = user;
+    req.user = {
+      id: decoded.id,
+      role: decoded.role
+    };
+
     next();
   } catch (error) {
-    res.status(401).json({ error: 'Authentication failed' });
-    return;
+    console.error('Authentication error:', error);
+    res.status(401).json({ error: 'Invalid token' });
   }
 };
 
-export const authorize = (roles: string[]) => {
-  return (req: Request, res: Response, next: NextFunction): void => {
-    const authReq = req as AuthenticatedRequest;
-    if (!authReq.user) {
-      res.status(401).json({ error: 'Not authorized to access this route' });
-      return;
+export const authorizeRoles = (roles: string[]) => {
+  return (req: Request, res: Response, next: NextFunction) => {
+    if (!req.user) {
+      return res.status(401).json({ error: 'Authentication required' });
     }
 
-    if (!roles.includes(authReq.user.role)) {
-      res.status(403).json({ error: 'Not authorized to access this route' });
-      return;
+    if (!roles.includes(req.user.role)) {
+      return res.status(403).json({ error: 'Insufficient permissions' });
     }
 
     next();
   };
 };
-
-export default protect;

@@ -1,0 +1,12 @@
+{
+    "name": "pms-system-tests",
+    "version": "1.0.0",
+    "description": "System tests for Parking Management System",
+    "scripts": {
+        "test": "ts-node system.test.ts"
+    },
+    "dependencies": {
+        "ts-node": "^10.9.1",
+        "typescript": "^5.0.0"
+    }
+}

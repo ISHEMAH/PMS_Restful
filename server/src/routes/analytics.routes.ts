@@ -1,9 +1,13 @@
-import express from 'express';
-import protect from '../middleware/auth';
+import { Router } from 'express';
+import { authenticateToken } from '../middleware/auth';
 import { getAnalytics } from '../controllers/analytics.controller';
 
-const router = express.Router();
+const router = Router();
 
-router.get('/', protect, getAnalytics);
+// All routes require authentication
+router.use(authenticateToken);
+
+// Analytics routes
+router.get('/', getAnalytics);
 
 export default router;

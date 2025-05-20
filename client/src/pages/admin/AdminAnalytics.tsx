@@ -1,260 +1,367 @@
 
-import { useState, useEffect } from 'react';
-import DashboardLayout from '@/components/layout/DashboardLayout';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { useToast } from '@/hooks/use-toast';
-import { Loader2 } from 'lucide-react';
-import analyticsService, { AnalyticsData } from '@/services/analyticsService';
+import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { adminApi } from "@/lib/api-client";
+import { format, subDays } from "date-fns";
+import { toast } from "sonner";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
-  Bar,
   BarChart,
-  Line,
-  LineChart,
-  Pie,
-  PieChart,
-  ResponsiveContainer,
-  Tooltip,
+  Bar,
   XAxis,
   YAxis,
-  Legend,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  PieChart,
+  Pie,
   Cell,
+  Legend,
+  LineChart,
+  Line,
 } from "recharts";
+import { DateRangePicker } from "@/components/ui/date-range-picker";
+import PageTransition from "@/components/layout/PageTransition";
+import { Analytics, VehicleTypeStats } from "@/lib/types";
+import { Download } from "lucide-react";
 
-// Colors for charts
-const COLORS = ['#8B5CF6', '#D946EF', '#F97316', '#0EA5E9', '#10B981', '#F43F5E'];
+// Custom colors for charts
+const COLORS = ["#3B82F6", "#10B981", "#F59E0B", "#EF4444", "#8B5CF6"];
 
-const AdminAnalytics = () => {
-  const [isLoading, setIsLoading] = useState(true);
-  const [analyticsData, setAnalyticsData] = useState<AnalyticsData | null>(null);
-  const [revenueTimeframe, setRevenueTimeframe] = useState('monthly');
-  const [occupancyTimeframe, setOccupancyTimeframe] = useState('daily');
-  
-  const { toast } = useToast();
+export default function AdminAnalytics() {
+  const [dateRange, setDateRange] = useState<{
+    from: Date;
+    to: Date;
+  }>({
+    from: subDays(new Date(), 30),
+    to: new Date(),
+  });
 
-  useEffect(() => {
-    const fetchAnalytics = async () => {
-      try {
-        setIsLoading(true);
-        const data = await analyticsService.getAnalyticsData();
-        setAnalyticsData(data);
-      } catch (error) {
-        console.error('Error fetching analytics:', error);
-        toast({
-          variant: "destructive",
-          title: "Failed to load analytics",
-          description: "Please try again later."
-        });
-      } finally {
-        setIsLoading(false);
-      }
-    };
+  // Fetch analytics data
+  const { data: analytics, isLoading } = useQuery({
+    queryKey: ["analytics", dateRange.from, dateRange.to],
+    queryFn: () =>
+      adminApi.getAnalytics(
+        format(dateRange.from, "yyyy-MM-dd"),
+        format(dateRange.to, "yyyy-MM-dd")
+      ),
+  });
 
-    fetchAnalytics();
-  }, [toast]);
+  // Helper function to format data for revenue chart
+  const getRevenueByVehicleTypeData = () => {
+    if (!analytics || !analytics.vehicleTypeStats) return [];
+    
+    return analytics.vehicleTypeStats.map((stat: VehicleTypeStats) => ({
+      name: stat.type,
+      value: stat.percentage * 100,
+    }));
+  };
 
-  const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD'
-    }).format(value);
+  // Helper function to format data for peak hours chart
+  const getPeakHoursData = () => {
+    if (!analytics || !analytics.peakHours) return [];
+    
+    return analytics.peakHours.map((hour: string) => {
+      const [hourRange, count] = hour.split(":");
+      return {
+        hour: hourRange,
+        count: parseInt(count.trim()),
+      };
+    });
+  };
+
+  // Export data as CSV
+  const exportData = () => {
+    if (!analytics) {
+      toast.error("No data to export");
+      return;
+    }
+
+    // Create CSV content
+    let csvContent = "data:text/csv;charset=utf-8,";
+    csvContent += "Metric,Value\n";
+    csvContent += `Total Bookings,${analytics.totalBookings}\n`;
+    csvContent += `Total Revenue,$${analytics.totalRevenue.toFixed(2)}\n`;
+    csvContent += `Occupancy Rate,${(analytics.occupancyRate * 100).toFixed(1)}%\n`;
+    csvContent += `Average Stay Duration,${analytics.averageStayDuration.toFixed(2)} hours\n\n`;
+    
+    csvContent += "Vehicle Type,Count,Percentage\n";
+    analytics.vehicleTypeStats.forEach((stat: VehicleTypeStats) => {
+      csvContent += `${stat.type},${stat.count},${(stat.percentage * 100).toFixed(1)}%\n`;
+    });
+
+    csvContent += "\nPeak Hours\n";
+    analytics.peakHours.forEach((hour: string) => {
+      csvContent += `${hour}\n`;
+    });
+
+    // Create download link
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", `analytics_${format(new Date(), "yyyy-MM-dd")}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+
+    toast.success("Analytics data exported successfully");
   };
 
   return (
-    <DashboardLayout>
-      <div className="space-y-6">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Analytics</h1>
-          <p className="text-muted-foreground">
-            View and analyze parking metrics and trends
-          </p>
+    <PageTransition>
+      <div className="space-y-8">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+          <div>
+            <h2 className="text-3xl font-bold tracking-tight">Parking Analytics</h2>
+            <p className="text-gray-500">
+              Track performance, revenue, and patterns
+            </p>
+          </div>
+          <div className="flex flex-col sm:flex-row gap-4">
+            <DateRangePicker
+              value={dateRange}
+              onChange={(range) => {
+                if (range?.from && range?.to) {
+                  setDateRange({ from: range.from, to: range.to });
+                }
+              }}
+            />
+            <Button onClick={exportData}>
+              <Download className="mr-2 h-4 w-4" />
+              Export
+            </Button>
+          </div>
         </div>
 
         {isLoading ? (
-          <div className="flex items-center justify-center h-64">
-            <Loader2 className="h-8 w-8 animate-spin text-primary-500" />
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+            {Array.from({ length: 4 }).map((_, index) => (
+              <Card key={index} className="animate-pulse">
+                <CardHeader className="pb-2">
+                  <div className="h-4 bg-gray-200 rounded w-1/2"></div>
+                </CardHeader>
+                <CardContent>
+                  <div className="h-8 bg-gray-200 rounded w-3/4 mb-2"></div>
+                  <div className="h-4 bg-gray-200 rounded w-1/4"></div>
+                </CardContent>
+              </Card>
+            ))}
           </div>
-        ) : !analyticsData ? (
-          <Card>
-            <CardContent className="flex flex-col items-center justify-center py-12">
-              <p className="text-lg text-muted-foreground mb-4">
-                No analytics data available
-              </p>
-            </CardContent>
-          </Card>
         ) : (
           <>
-            <div className="grid gap-6 md:grid-cols-2">
-              <Card className="col-span-2 md:col-span-1">
-                <CardHeader className="flex flex-row items-center justify-between">
-                  <div>
-                    <CardTitle>Revenue</CardTitle>
-                    <CardDescription>
-                      Revenue trends over time
-                    </CardDescription>
-                  </div>
-                  <Select value={revenueTimeframe} onValueChange={setRevenueTimeframe}>
-                    <SelectTrigger className="w-32">
-                      <SelectValue placeholder="Period" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="daily">Daily</SelectItem>
-                      <SelectItem value="weekly">Weekly</SelectItem>
-                      <SelectItem value="monthly">Monthly</SelectItem>
-                    </SelectContent>
-                  </Select>
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+              {/* Total Bookings */}
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between pb-2">
+                  <CardTitle className="text-sm font-medium">
+                    Total Bookings
+                  </CardTitle>
                 </CardHeader>
-                <CardContent className="h-80">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={analyticsData.revenueData}>
-                      <XAxis
-                        dataKey="period"
-                        stroke="#888888"
-                        fontSize={12}
-                        tickLine={false}
-                        axisLine={false}
-                      />
-                      <YAxis
-                        stroke="#888888"
-                        fontSize={12}
-                        tickLine={false}
-                        axisLine={false}
-                        tickFormatter={(value) => `$${value}`}
-                      />
-                      <Tooltip
-                        formatter={(value) => [formatCurrency(value as number), 'Revenue']}
-                      />
-                      <Bar dataKey="amount" fill="#8B5CF6" radius={[4, 4, 0, 0]} />
-                    </BarChart>
-                  </ResponsiveContainer>
+                <CardContent>
+                  <div className="text-2xl font-bold">
+                    {analytics?.totalBookings || 0}
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    For selected period
+                  </p>
                 </CardContent>
               </Card>
-              
-              <Card className="col-span-2 md:col-span-1">
-                <CardHeader className="flex flex-row items-center justify-between">
-                  <div>
-                    <CardTitle>Occupancy Rates</CardTitle>
-                    <CardDescription>
-                      Parking occupancy percentage over time
-                    </CardDescription>
-                  </div>
-                  <Select value={occupancyTimeframe} onValueChange={setOccupancyTimeframe}>
-                    <SelectTrigger className="w-32">
-                      <SelectValue placeholder="Period" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="daily">Daily</SelectItem>
-                      <SelectItem value="weekly">Weekly</SelectItem>
-                      <SelectItem value="monthly">Monthly</SelectItem>
-                    </SelectContent>
-                  </Select>
+
+              {/* Total Revenue */}
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between pb-2">
+                  <CardTitle className="text-sm font-medium">
+                    Total Revenue
+                  </CardTitle>
                 </CardHeader>
-                <CardContent className="h-80">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={analyticsData.occupancyRates}>
-                      <XAxis
-                        dataKey="period"
-                        stroke="#888888"
-                        fontSize={12}
-                        tickLine={false}
-                        axisLine={false}
-                      />
-                      <YAxis
-                        stroke="#888888"
-                        fontSize={12}
-                        tickLine={false}
-                        axisLine={false}
-                        domain={[0, 100]}
-                        tickFormatter={(value) => `${value}%`}
-                      />
-                      <Tooltip
-                        formatter={(value) => [`${value}%`, 'Occupancy Rate']}
-                      />
-                      <Line
-                        type="monotone"
-                        dataKey="rate"
-                        stroke="#D946EF"
-                        strokeWidth={2}
-                        dot={{ fill: "#D946EF" }}
-                        activeDot={{ r: 6 }}
-                      />
-                    </LineChart>
-                  </ResponsiveContainer>
+                <CardContent>
+                  <div className="text-2xl font-bold">
+                    ${analytics?.totalRevenue?.toFixed(2) || "0.00"}
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    For selected period
+                  </p>
                 </CardContent>
               </Card>
-              
-              <Card className="col-span-2">
-                <CardHeader>
-                  <CardTitle>Vehicle Types Distribution</CardTitle>
-                  <CardDescription>
-                    Breakdown of vehicle types in the parking system
-                  </CardDescription>
+
+              {/* Occupancy Rate */}
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between pb-2">
+                  <CardTitle className="text-sm font-medium">
+                    Occupancy Rate
+                  </CardTitle>
                 </CardHeader>
-                <CardContent className="flex justify-center h-80">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                      <Pie
-                        data={analyticsData.vehicleTypes}
-                        cx="50%"
-                        cy="50%"
-                        labelLine={false}
-                        outerRadius={100}
-                        fill="#8884d8"
-                        dataKey="count"
-                        nameKey="type"
-                        label={({type, percent}) => `${type}: ${(percent * 100).toFixed(0)}%`}
-                      >
-                        {analyticsData.vehicleTypes.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                        ))}
-                      </Pie>
-                      <Tooltip formatter={(value) => [value, 'Count']} />
-                      <Legend />
-                    </PieChart>
-                  </ResponsiveContainer>
+                <CardContent>
+                  <div className="text-2xl font-bold">
+                    {analytics?.occupancyRate
+                      ? `${(analytics.occupancyRate * 100).toFixed(1)}%`
+                      : "0%"}
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Average for selected period
+                  </p>
+                </CardContent>
+              </Card>
+
+              {/* Average Stay Duration */}
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between pb-2">
+                  <CardTitle className="text-sm font-medium">
+                    Avg. Stay Duration
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">
+                    {analytics?.averageStayDuration?.toFixed(2) || "0"} hrs
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Average for selected period
+                  </p>
                 </CardContent>
               </Card>
             </div>
-            
-            <Card>
-              <CardHeader>
-                <CardTitle>Summary</CardTitle>
-                <CardDescription>Key insights from the analytics data</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid gap-4 md:grid-cols-3">
-                  <div className="space-y-2 border p-4 rounded-lg">
-                    <p className="text-sm font-medium text-muted-foreground">Total Bookings</p>
-                    <p className="text-2xl font-bold">{analyticsData.totalBookings}</p>
-                  </div>
-                  
-                  <div className="space-y-2 border p-4 rounded-lg">
-                    <p className="text-sm font-medium text-muted-foreground">Current Occupancy</p>
-                    <p className="text-2xl font-bold">
-                      {Math.round(analyticsData.occupancyRates[0]?.rate || 0)}%
-                    </p>
-                  </div>
-                  
-                  <div className="space-y-2 border p-4 rounded-lg">
-                    <p className="text-sm font-medium text-muted-foreground">Most Common Vehicle</p>
-                    <p className="text-2xl font-bold">
-                      {analyticsData.vehicleTypes[0]?.type || 'N/A'}
-                    </p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+
+            <Tabs defaultValue="vehicle-types" className="space-y-4">
+              <TabsList>
+                <TabsTrigger value="vehicle-types">Vehicle Types</TabsTrigger>
+                <TabsTrigger value="peak-hours">Peak Hours</TabsTrigger>
+              </TabsList>
+              <TabsContent value="vehicle-types" className="space-y-4">
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Vehicle Distribution</CardTitle>
+                    <CardDescription>
+                      Breakdown of vehicle types using the parking
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="pl-2">
+                    <div className="h-[400px]">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <PieChart>
+                          <Pie
+                            data={getRevenueByVehicleTypeData()}
+                            cx="50%"
+                            cy="50%"
+                            labelLine={false}
+                            label={({ name, percent }) =>
+                              `${name}: ${(percent * 100).toFixed(0)}%`
+                            }
+                            outerRadius={120}
+                            fill="#8884d8"
+                            dataKey="value"
+                          >
+                            {getRevenueByVehicleTypeData().map((entry, index) => (
+                              <Cell
+                                key={`cell-${index}`}
+                                fill={COLORS[index % COLORS.length]}
+                              />
+                            ))}
+                          </Pie>
+                          <Tooltip
+                            formatter={(value: number) => [`${value.toFixed(1)}%`, "Percentage"]}
+                          />
+                          <Legend />
+                        </PieChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Vehicle Type Stats Table */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Vehicle Type Statistics</CardTitle>
+                    <CardDescription>
+                      Detailed statistics for each vehicle type
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="rounded-md border">
+                      <table className="min-w-full divide-y divide-gray-200">
+                        <thead className="bg-gray-50">
+                          <tr>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                              Type
+                            </th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                              Count
+                            </th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                              Percentage
+                            </th>
+                          </tr>
+                        </thead>
+                        <tbody className="bg-white divide-y divide-gray-200">
+                          {analytics?.vehicleTypeStats?.length ? (
+                            analytics.vehicleTypeStats.map((stat, index) => (
+                              <tr key={index}>
+                                <td className="px-6 py-4 whitespace-nowrap">
+                                  {stat.type}
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap">
+                                  {stat.count}
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap">
+                                  {(stat.percentage * 100).toFixed(1)}%
+                                </td>
+                              </tr>
+                            ))
+                          ) : (
+                            <tr>
+                              <td
+                                colSpan={3}
+                                className="px-6 py-4 text-center text-gray-500"
+                              >
+                                No data available
+                              </td>
+                            </tr>
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </CardContent>
+                </Card>
+              </TabsContent>
+
+              <TabsContent value="peak-hours" className="space-y-4">
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Peak Hours Analysis</CardTitle>
+                    <CardDescription>
+                      Distribution of bookings throughout the day
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="pl-2">
+                    <div className="h-[400px]">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={getPeakHoursData()}>
+                          <CartesianGrid strokeDasharray="3 3" />
+                          <XAxis dataKey="hour" />
+                          <YAxis />
+                          <Tooltip />
+                          <Bar
+                            dataKey="count"
+                            name="Number of Bookings"
+                            fill="#3B82F6"
+                          />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </CardContent>
+                </Card>
+              </TabsContent>
+            </Tabs>
           </>
         )}
       </div>
-    </DashboardLayout>
+    </PageTransition>
   );
-};
-
-export default AdminAnalytics;
+}

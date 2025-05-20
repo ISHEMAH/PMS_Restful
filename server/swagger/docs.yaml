@@ -2,10 +2,408 @@ openapi: 3.0.0
 info:
   title: Parking Management System API
   version: 1.0.0
+  description: |
+    API documentation for the Parking Management System
+    
+    ## Authentication Flow
+    1. Register as a user
+    2. Login to get JWT token
+    3. Use token in Authorization header for all subsequent requests
+    
+    ## Admin Flow
+    1. Create admin account using admin key
+    2. Admin creates parking location with slots
+    3. Admin manages their parking(s)
+    4. Admin views analytics and reports
+    
+    ## User Flow
+    1. Register and login
+    2. Register vehicle(s)
+    3. View available parkings
+    4. Create bookings for parking
+    5. View booking history and status
+    6. Checkout when done
+
+    ## Booking Flow
+    1. User creates booking request
+    2. System assigns available slot
+    3. Booking status: PENDING -> APPROVED -> COMPLETED
+    4. User can checkout when done
+
+    ## Analytics Flow
+    1. Admin views total bookings
+    2. Revenue tracking
+    3. Occupancy rates
+    4. Vehicle type distribution
+    5. Peak hours analysis
+
+servers:
+  - url: http://localhost:3000
+    description: Development server
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+    adminKey:
+      type: apiKey
+      in: header
+      name: x-admin-key
+      description: Secret key for admin operations
+
+  schemas:
+    UserSignup:
+      type: object
+      required:
+        - email
+        - password
+        - firstName
+        - lastName
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          minLength: 6
+        firstName:
+          type: string
+          minLength: 2
+        lastName:
+          type: string
+          minLength: 2
+
+    UserLogin:
+      type: object
+      required:
+        - email
+        - password
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+
+    CreateAdmin:
+      type: object
+      required:
+        - email
+        - password
+        - firstName
+        - lastName
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          minLength: 6
+        firstName:
+          type: string
+          minLength: 2
+        lastName:
+          type: string
+          minLength: 2
+
+    LoginResponse:
+      type: object
+      properties:
+        message:
+          type: string
+        token:
+          type: string
+        user:
+          $ref: '#/components/schemas/User'
+
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+        email:
+          type: string
+        firstName:
+          type: string
+        lastName:
+          type: string
+        role:
+          type: string
+          enum: [USER, ADMIN]
+
+    Vehicle:
+      type: object
+      properties:
+        id:
+          type: string
+        plateNumber:
+          type: string
+        type:
+          type: string
+          enum: [CAR, MOTORCYCLE, BIKE]
+        ownerId:
+          type: string
+        slotId:
+          type: integer
+          nullable: true
+        checkIn:
+          type: string
+          format: date-time
+          nullable: true
+        checkOut:
+          type: string
+          format: date-time
+          nullable: true
+        paid:
+          type: boolean
+
+    CreateVehicle:
+      type: object
+      required:
+        - plateNumber
+        - type
+      properties:
+        plateNumber:
+          type: string
+        type:
+          type: string
+          enum: [CAR, MOTORCYCLE, BIKE]
+
+    Booking:
+      type: object
+      properties:
+        id:
+          type: string
+        userId:
+          type: string
+        vehicleId:
+          type: string
+        parkingId:
+          type: string
+        slotId:
+          type: integer
+        status:
+          type: string
+          enum: [PENDING, APPROVED, DECLINED, CHECKED_OUT, CANCELLED]
+        startTime:
+          type: string
+          format: date-time
+        endTime:
+          type: string
+          format: date-time
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    CreateBooking:
+      type: object
+      required:
+        - vehicleId
+        - parkingId
+        - startTime
+        - endTime
+      properties:
+        vehicleId:
+          type: string
+        parkingId:
+          type: string
+        startTime:
+          type: string
+          format: date-time
+        endTime:
+          type: string
+          format: date-time
+
+    Parking:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        address:
+          type: string
+        totalSlots:
+          type: integer
+        availableSlots:
+          type: integer
+        chargingFeePerHour:
+          type: number
+        adminId:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    CreateParking:
+      type: object
+      required:
+        - name
+        - address
+        - totalSlots
+        - chargingFeePerHour
+      properties:
+        name:
+          type: string
+        address:
+          type: string
+        totalSlots:
+          type: integer
+        chargingFeePerHour:
+          type: number
+
+    UpdateParking:
+      type: object
+      properties:
+        name:
+          type: string
+        address:
+          type: string
+        totalSlots:
+          type: integer
+        chargingFeePerHour:
+          type: number
+
+    Analytics:
+      type: object
+      properties:
+        totalSlots:
+          type: integer
+        occupiedSlots:
+          type: integer
+        occupancyRate:
+          type: number
+        revenueByType:
+          type: object
+          additionalProperties:
+            type: number
+        bookingsByStatus:
+          type: object
+          additionalProperties:
+            type: integer
+        peakHours:
+          type: object
+          additionalProperties:
+            type: integer
+
+    Report:
+      type: object
+      properties:
+        id:
+          type: string
+        type:
+          type: string
+          enum: [DAILY, WEEKLY, MONTHLY, YEARLY]
+        startDate:
+          type: string
+          format: date-time
+        endDate:
+          type: string
+          format: date-time
+        data:
+          type: object
+          additionalProperties: true
+
+    ReportSummary:
+      type: object
+      properties:
+        totalRevenue:
+          type: number
+        totalBookings:
+          type: integer
+        averageOccupancy:
+          type: number
+        peakHours:
+          type: array
+          items:
+            type: string
+        mostCommonVehicleType:
+          type: string
+
+    RevenueReport:
+      type: object
+      properties:
+        totalRevenue:
+          type: number
+        revenueByPeriod:
+          type: array
+          items:
+            type: object
+            properties:
+              period:
+                type: string
+              revenue:
+                type: number
+        revenueByVehicleType:
+          type: object
+          additionalProperties:
+            type: number
+
+    OccupancyReport:
+      type: object
+      properties:
+        averageOccupancy:
+          type: number
+        occupancyByPeriod:
+          type: array
+          items:
+            type: object
+            properties:
+              period:
+                type: string
+              occupancy:
+                type: number
+        maxOccupancy:
+          type: number
+        minOccupancy:
+          type: number
+
+    VehicleTypeReport:
+      type: object
+      properties:
+        totalVehicles:
+          type: integer
+        distribution:
+          type: object
+          additionalProperties:
+            type: number
+        revenueByType:
+          type: object
+          additionalProperties:
+            type: number
+
+    PeakHoursReport:
+      type: object
+      properties:
+        peakHours:
+          type: array
+          items:
+            type: object
+            properties:
+              hour:
+                type: integer
+              occupancy:
+                type: number
+              revenue:
+                type: number
+        busiestHour:
+          type: integer
+        quietestHour:
+          type: integer
+
 paths:
-  /auth/signup:
+  /api/v1/auth/signup:
     post:
-      summary: User Signup
+      summary: Register a new user
+      tags: [Authentication]
       requestBody:
         required: true
         content:
@@ -13,22 +411,710 @@ paths:
             schema:
               $ref: '#/components/schemas/UserSignup'
       responses:
-        '200':
-          description: Success
-  /auth/login:
+        '201':
+          description: User registered successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginResponse'
+        '400':
+          description: Invalid input data
+        '409':
+          description: Email already exists
+
+  /api/v1/auth/login:
     post:
-      summary: User Login
+      summary: Login user
+      tags: [Authentication]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserLogin'
       responses:
         '200':
-          description: Success
-components:
-  schemas:
-    UserSignup:
-      type: object
-      properties:
-        name:
-          type: string
-        email:
-          type: string
-        password:
-          type: string
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginResponse'
+        '401':
+          description: Invalid credentials
+
+  /api/v1/auth/create-admin:
+    post:
+      summary: Create admin user
+      tags: [Authentication]
+      security:
+        - adminKey: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateAdmin'
+      responses:
+        '201':
+          description: Admin created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginResponse'
+        '400':
+          description: Invalid input data
+        '401':
+          description: Invalid admin key
+
+  /api/v1/vehicles:
+    get:
+      summary: Get user's vehicles
+      tags: [Vehicles]
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: List of vehicles
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Vehicle'
+    post:
+      summary: Register a new vehicle
+      tags: [Vehicles]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateVehicle'
+      responses:
+        '201':
+          description: Vehicle registered successfully
+        '400':
+          description: Invalid input data
+        '401':
+          description: Unauthorized
+
+  /api/v1/vehicles/{id}:
+    put:
+      summary: Update vehicle
+      tags: [Vehicles]
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateVehicle'
+      responses:
+        '200':
+          description: Vehicle updated successfully
+        '400':
+          description: Invalid input data
+        '401':
+          description: Unauthorized
+        '404':
+          description: Vehicle not found
+    delete:
+      summary: Delete vehicle
+      tags: [Vehicles]
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: Vehicle deleted successfully
+        '401':
+          description: Unauthorized
+        '404':
+          description: Vehicle not found
+
+  /api/v1/bookings:
+    get:
+      summary: Get user's bookings
+      tags: [Bookings]
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: List of bookings
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Booking'
+    post:
+      summary: Create a new booking
+      tags: [Bookings]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateBooking'
+      responses:
+        '201':
+          description: Booking created successfully
+        '400':
+          description: Invalid input data
+        '401':
+          description: Unauthorized
+
+  /api/v1/bookings/{id}:
+    get:
+      summary: Get booking by ID
+      tags: [Bookings]
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Booking details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Booking'
+        '401':
+          description: Unauthorized
+        '404':
+          description: Booking not found
+    put:
+      summary: Update booking
+      tags: [Bookings]
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateBooking'
+      responses:
+        '200':
+          description: Booking updated successfully
+        '400':
+          description: Invalid input data
+        '401':
+          description: Unauthorized
+        '404':
+          description: Booking not found
+    delete:
+      summary: Delete booking
+      tags: [Bookings]
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: Booking deleted successfully
+        '401':
+          description: Unauthorized
+        '404':
+          description: Booking not found
+
+  /api/v1/checkout/{id}:
+    post:
+      summary: Checkout booking
+      tags: [Bookings]
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Checkout successful
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  totalAmount:
+                    type: number
+                  duration:
+                    type: number
+                  checkOutTime:
+                    type: string
+                    format: date-time
+        '400':
+          description: Invalid booking
+        '401':
+          description: Unauthorized
+        '404':
+          description: Booking not found
+
+  /api/v1/admin/bookings:
+    get:
+      summary: Get all bookings (admin only)
+      tags: [Admin]
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: List of all bookings
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Booking'
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden - Admin access required
+
+  /api/v1/admin/bookings/{bookingId}/approve:
+    put:
+      summary: Approve booking (admin only)
+      tags: [Admin]
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: bookingId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Booking approved successfully
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden - Admin access required
+        '404':
+          description: Booking not found
+
+  /api/v1/admin/bookings/{bookingId}/decline:
+    put:
+      summary: Decline booking (admin only)
+      tags: [Admin]
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: bookingId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Booking declined successfully
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden - Admin access required
+        '404':
+          description: Booking not found
+
+  /api/v1/admin/analytics:
+    get:
+      summary: Get parking analytics (admin only)
+      tags: [Admin]
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Parking analytics data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Analytics'
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden - Admin access required
+
+  /api/v1/admin/history:
+    get:
+      summary: Get parking history (admin only)
+      tags: [Admin]
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: startDate
+          in: query
+          schema:
+            type: string
+            format: date-time
+        - name: endDate
+          in: query
+          schema:
+            type: string
+            format: date-time
+      responses:
+        '200':
+          description: Parking history data
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  bookings:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Booking'
+                  totalBookings:
+                    type: integer
+                  totalRevenue:
+                    type: number
+                  averageStayDuration:
+                    type: number
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden - Admin access required
+
+  /api/v1/parking:
+    get:
+      summary: Get all parkings
+      tags: [Parking]
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: List of parkings
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Parking'
+    post:
+      summary: Create new parking
+      tags: [Parking]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateParking'
+      responses:
+        '201':
+          description: Parking created successfully
+        '400':
+          description: Invalid input data
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden - Admin access required
+
+  /api/v1/parking/{id}:
+    get:
+      summary: Get parking by ID
+      tags: [Parking]
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Parking details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Parking'
+        '401':
+          description: Unauthorized
+        '404':
+          description: Parking not found
+    put:
+      summary: Update parking
+      tags: [Parking]
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateParking'
+      responses:
+        '200':
+          description: Parking updated successfully
+        '400':
+          description: Invalid input data
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden - Admin access required
+        '404':
+          description: Parking not found
+    delete:
+      summary: Delete parking
+      tags: [Parking]
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: Parking deleted successfully
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden - Admin access required
+        '404':
+          description: Parking not found
+
+  /api/v1/admin/reports:
+    get:
+      summary: Get all reports (admin only)
+      tags: [Admin]
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: startDate
+          in: query
+          schema:
+            type: string
+            format: date-time
+        - name: endDate
+          in: query
+          schema:
+            type: string
+            format: date-time
+        - name: type
+          in: query
+          schema:
+            type: string
+            enum: [DAILY, WEEKLY, MONTHLY, YEARLY]
+      responses:
+        '200':
+          description: Reports data
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  reports:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Report'
+                  summary:
+                    $ref: '#/components/schemas/ReportSummary'
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden - Admin access required
+
+  /api/v1/admin/reports/export:
+    get:
+      summary: Export reports (admin only)
+      tags: [Admin]
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: startDate
+          in: query
+          schema:
+            type: string
+            format: date-time
+        - name: endDate
+          in: query
+          schema:
+            type: string
+            format: date-time
+        - name: format
+          in: query
+          schema:
+            type: string
+            enum: [CSV, PDF, EXCEL]
+      responses:
+        '200':
+          description: Exported report file
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden - Admin access required
+
+  /api/v1/admin/reports/revenue:
+    get:
+      summary: Get revenue report (admin only)
+      tags: [Admin]
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: startDate
+          in: query
+          schema:
+            type: string
+            format: date-time
+        - name: endDate
+          in: query
+          schema:
+            type: string
+            format: date-time
+        - name: groupBy
+          in: query
+          schema:
+            type: string
+            enum: [DAY, WEEK, MONTH, YEAR]
+      responses:
+        '200':
+          description: Revenue report data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RevenueReport'
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden - Admin access required
+
+  /api/v1/admin/reports/occupancy:
+    get:
+      summary: Get occupancy report (admin only)
+      tags: [Admin]
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: startDate
+          in: query
+          schema:
+            type: string
+            format: date-time
+        - name: endDate
+          in: query
+          schema:
+            type: string
+            format: date-time
+        - name: parkingId
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Occupancy report data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OccupancyReport'
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden - Admin access required
+
+  /api/v1/admin/reports/vehicle-types:
+    get:
+      summary: Get vehicle type distribution report (admin only)
+      tags: [Admin]
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: startDate
+          in: query
+          schema:
+            type: string
+            format: date-time
+        - name: endDate
+          in: query
+          schema:
+            type: string
+            format: date-time
+      responses:
+        '200':
+          description: Vehicle type distribution data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VehicleTypeReport'
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden - Admin access required
+
+  /api/v1/admin/reports/peak-hours:
+    get:
+      summary: Get peak hours report (admin only)
+      tags: [Admin]
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: startDate
+          in: query
+          schema:
+            type: string
+            format: date-time
+        - name: endDate
+          in: query
+          schema:
+            type: string
+            format: date-time
+        - name: parkingId
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Peak hours data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PeakHoursReport'
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden - Admin access required

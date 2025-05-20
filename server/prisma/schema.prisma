@@ -16,11 +16,13 @@ model User {
   id        String   @id @default(cuid())
   email     String   @unique
   password  String
-  name      String
+  firstName String
+  lastName  String
   role      Role     @default(USER)
   vehicles  Vehicle[]
   bookings  Booking[]
   auditLogs AuditLog[]
+  parkings  Parking[]
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
@@ -38,6 +40,7 @@ model Vehicle {
   paid        Boolean  @default(false)
   bookings    Booking[]
   auditLogs   AuditLog[]
+  tickets     Ticket[]
 }
 
 enum SlotStatus {
@@ -69,12 +72,15 @@ enum BookingStatus {
 }
 
 model Slot {
-  id        Int      @id @default(autoincrement())
-  number    Int      @unique
-  type      VehicleType
-  status    SlotStatus @default(AVAILABLE)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id          Int      @id @default(autoincrement())
+  number      Int
+  parkingCode String
+  type        VehicleType
+  status      SlotStatus @default(AVAILABLE)
+  parking     Parking   @relation(fields: [parkingId], references: [id])
+  parkingId   String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
   // Relations
   Booking   Booking[]
@@ -154,15 +160,51 @@ model AuditLog {
   vehicleId String?
 }
 
-
-
 enum PaymentStatus {
   PENDING
   PAID
   UNPAID
 }
+
 enum PaymentMethod {
   CASH
   CARD
   ONLINE
+}
+
+model Parking {
+  id                String   @id @default(cuid())
+  code              String   @unique
+  name              String
+  location          String
+  totalSpaces       Int
+  availableSpaces   Int
+  chargingFeePerHour Float
+  admin             User     @relation(fields: [adminId], references: [id])
+  adminId           String
+  slots             Slot[]
+  tickets           Ticket[]
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+}
+
+model Ticket {
+  id            String   @id @default(cuid())
+  ticketNumber  String   @unique
+  vehicle       Vehicle  @relation(fields: [vehicleId], references: [id])
+  vehicleId     String
+  parking       Parking  @relation(fields: [parkingId], references: [id])
+  parkingId     String
+  entryTime     DateTime
+  exitTime      DateTime?
+  amount        Float    @default(0)
+  status        TicketStatus @default(ACTIVE)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+enum TicketStatus {
+  ACTIVE
+  COMPLETED
+  CANCELLED
 }

@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import { prisma } from '../types/prisma';
 import nodemailer from 'nodemailer';
+import { calculateDuration, calculateAmount } from '../utils/parking.utils';
 
 interface CheckoutDetails {
   slotNumber: number;
@@ -12,12 +13,6 @@ interface CheckoutDetails {
   name: string;
   email: string;
 }
-
-const calculateAmount = (entry: Date, checkout: Date) => {
-  const duration = Math.ceil((checkout.getTime() - entry.getTime()) / (1000 * 60 * 60));
-  const ratePerHour = 2;
-  return duration * ratePerHour;
-};
 
 const sendCheckoutEmail = async (email: string, details: any) => {
   const transporter = nodemailer.createTransport({
@@ -46,71 +41,62 @@ const sendCheckoutEmail = async (email: string, details: any) => {
   await transporter.sendMail(mailOptions);
 };
 
-export const checkoutVehicle = async (bookingId: string) => {
-  if (!bookingId) {
-    throw new Error('Booking ID is required');
-  }
+export const checkoutVehicle = async (req: Request, res: Response) => {
+  const { bookingId } = req.params;
+  const userId = req.user.id;
 
   try {
-    const booking = await prisma.booking.findUnique({
-      where: { id: bookingId },
+    // Find the booking
+    const booking = await prisma.booking.findFirst({
+      where: {
+        id: bookingId,
+        userId
+      },
       include: {
-        user: {
-          include: {
-            vehicles: {
-              where: {
-                id: bookingId
-              }
-            }
-          }
-        },
-        slot: true
+        vehicle: true,
+        parking: true
       }
     });
 
     if (!booking) {
-      throw new Error('Booking not found');
+      return res.status(404).json({ error: 'Booking not found' });
     }
 
     if (booking.status !== 'APPROVED') {
-      throw new Error('Booking is not approved');
+      return res.status(400).json({ error: 'Can only checkout approved bookings' });
     }
 
-    if (!booking.slot) {
-      throw new Error('No slot assigned to this booking');
-    }
+    // Calculate duration and amount
+    const duration = calculateDuration(booking.startTime, new Date());
+    const amount = calculateAmount(duration, booking.parking.chargingFeePerHour);
 
-    const checkoutTime = new Date();
-    const amount = calculateAmount(booking.entryTime || new Date(), checkoutTime);
-
-    await prisma.booking.update({
+    // Update booking status and add checkout time
+    const updatedBooking = await prisma.booking.update({
       where: { id: bookingId },
       data: {
-        status: 'CHECKED_OUT',
-        checkoutTime,
-        amount,
-        paymentMethod: 'CASH'
+        status: 'COMPLETED',
+        endTime: new Date(),
+        amount
+      },
+      include: {
+        vehicle: true,
+        parking: true
       }
     });
 
-    const vehicle = booking.user.vehicles[0]; // Get the first vehicle since we filtered by bookingId
-    if (!vehicle) {
-      throw new Error('Vehicle not found for this booking');
-    }
-
-    await sendCheckoutEmail(booking.user.email, {
-      name: booking.user.name,
-      plateNumber: vehicle.plateNumber,
-      slotNumber: booking.slot.number,
-      entryTime: booking.entryTime || new Date(),
-      checkoutTime,
-      amount,
-      paymentMethod: 'CASH'
+    // Update available spaces in parking
+    await prisma.parking.update({
+      where: { id: booking.parkingId },
+      data: {
+        availableSpaces: {
+          increment: 1
+        }
+      }
     });
 
-    return { success: true, booking };
+    res.json(updatedBooking);
   } catch (error) {
-    console.error('Checkout error:', error);
-    throw error;
+    console.error('Error during checkout:', error);
+    res.status(500).json({ error: 'Failed to process checkout' });
   }
 };

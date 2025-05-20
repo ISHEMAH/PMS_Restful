@@ -10,7 +10,8 @@
     "test": "mocha -r ts-node/register test/**/*.test.ts",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
-    "prisma:studio": "prisma studio"
+    "prisma:studio": "prisma studio",
+    "verify-env": "ts-node src/scripts/verify-env.ts"
   },
   "keywords": [],
   "author": "",
@@ -31,6 +32,7 @@
     "@types/supertest": "^6.0.3",
     "@types/swagger-ui-express": "^4.1.8",
     "@types/uuid": "^10.0.0",
+    "axios": "^1.9.0",
     "chai": "^4.3.7",
     "mocha": "^10.2.0",
     "nodemon": "^3.1.10",

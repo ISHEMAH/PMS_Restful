@@ -6,6 +6,18 @@ import morgan from 'morgan';
 import { CronService } from './services/cron.service';
 import { prisma } from './types/prisma';
 import swaggerUi from 'swagger-ui-express';
+import YAML from 'yamljs';
+import path from 'path';
+
+// Import routes
+import authRoutes from './routes/auth.routes';
+import vehicleRoutes from './routes/vehicle.routes';
+import parkingRoutes from './routes/parking.routes';
+import bookingRoutes from './routes/booking.routes';
+import checkoutRoutes from './routes/checkout.routes';
+import ticketRoutes from './routes/ticket.routes';
+import analyticsRoutes from './routes/analytics.routes';
+import reportRoutes from './routes/report.routes';
 
 const app = express();
 
@@ -14,28 +26,54 @@ app.use(cors());
 app.use(express.json());
 app.use(morgan('dev'));
 
-// Add these lines before your routes
-const swaggerDocument = require('../swagger/swagger.json');
+// Swagger documentation
+const swaggerDocument = YAML.load(path.join(__dirname, '../swagger/docs.yaml'));
 
-app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument));
+// Configure Swagger UI options
+const swaggerOptions = {
+  explorer: true,
+  customCss: '.swagger-ui .topbar { display: none }',
+  customSiteTitle: "Parking Management System API",
+  swaggerOptions: {
+    persistAuthorization: true,
+    displayRequestDuration: true,
+    docExpansion: 'list',
+    filter: true,
+    showCommonExtensions: true,
+    defaultModelsExpandDepth: 3,
+    defaultModelExpandDepth: 3,
+    defaultModelRendering: 'model',
+    displayOperationId: false,
+    syntaxHighlight: {
+      activate: true,
+      theme: 'monokai'
+    }
+  }
+};
 
-app.get('/swagger.json', (req, res) => {
-  res.json(swaggerDocument);
-});
+// Add base path to Swagger document
+swaggerDocument.basePath = '/api/v1';
+
+// Serve Swagger documentation
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument, swaggerOptions));
 
 // Routes
-app.use('/api/auth', require('./routes/auth.routes').default);
-app.use('/api/admin/slots', require('./routes/admin.slot').default);
-app.use('/api/vehicles', require('./routes/vehicle.routes').default);
-app.use('/api/bookings', require('./routes/booking.routes').default);
-app.use('/api/checkout', require('./routes/checkout.routes').default);
-app.use('/api/history', require('./routes/history.routes').default);
-app.use('/api/analytics', require('./routes/analytics.routes').default);
+app.use('/api/v1/auth', authRoutes);
+app.use('/api/v1/vehicles', vehicleRoutes);
+app.use('/api/v1/parking', parkingRoutes);
+app.use('/api/v1/bookings', bookingRoutes);
+app.use('/api/v1/checkout', checkoutRoutes);
+app.use('/api/v1/tickets', ticketRoutes);
+app.use('/api/v1/analytics', analyticsRoutes);
+app.use('/api/v1/reports', reportRoutes);
 
-// Error handling
+// Error handling middleware
 app.use((err: Error, req: express.Request, res: express.Response, next: express.NextFunction) => {
   console.error(err.stack);
-  res.status(500).json({ error: 'Something went wrong!' });
+  if (res.headersSent) {
+    return next(err);
+  }
+  res.status(500).json({ error: 'Something went wrong!', details: err.message, stack: err.stack });
 });
 
 // Start cron service

@@ -1,135 +1,265 @@
 
-import { useState, useEffect } from 'react';
-import { useNavigate, Link, useLocation } from 'react-router-dom';
-import { useAuth } from '@/context/AuthContext';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { Label } from '@/components/ui/label';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Loader2 } from 'lucide-react';
+import { useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import { motion } from "framer-motion";
+import { z } from "zod";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 
-const Login = () => {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [rememberMe, setRememberMe] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const { login, isAuthenticated, isAdmin } = useAuth();
+import { Button } from "@/components/ui/button";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
+import { useAuthStore } from "@/lib/auth-store";
+import Navbar from "@/components/layout/Navbar";
+import Footer from "@/components/layout/Footer";
+import PageTransition from "@/components/layout/PageTransition";
+import { Mail, Key, Loader2, ArrowLeft } from "lucide-react";
+
+const loginSchema = z.object({
+  email: z.string().email("Please enter a valid email address"),
+  password: z.string().min(6, "Password must be at least 6 characters"),
+  rememberMe: z.boolean().default(false),
+});
+
+type LoginFormValues = z.infer<typeof loginSchema>;
+
+export default function Login() {
   const navigate = useNavigate();
+  const { login, isLoading } = useAuthStore();
+  const [formError, setFormError] = useState<string | null>(null);
 
-  // Check if user is already authenticated and redirect accordingly
-  useEffect(() => {
-    if (isAuthenticated) {
-      const redirectPath = isAdmin ? '/admin/dashboard' : '/user/dashboard';
-      navigate(redirectPath, { replace: true });
-    }
-  }, [isAuthenticated, isAdmin, navigate]);
+  const form = useForm<LoginFormValues>({
+    resolver: zodResolver(loginSchema),
+    defaultValues: {
+      email: "",
+      password: "",
+      rememberMe: false,
+    },
+  });
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (!email || !password) {
-      return;
-    }
+  const onSubmit = async (data: LoginFormValues) => {
+    setFormError(null);
     
     try {
-      setIsSubmitting(true);
-      const response = await login(email, password);
-      console.log("Login successful:", response);
+      await login(data.email, data.password);
       
-      // Explicitly redirect based on role
-      if (response?.user?.role === 'admin') {
-        navigate('/admin/dashboard', { replace: true });
+      if (data.rememberMe) {
+        localStorage.setItem("rememberedEmail", data.email);
       } else {
-        navigate('/user/dashboard', { replace: true });
+        localStorage.removeItem("rememberedEmail");
       }
+      
+      // Assuming login sets user, we'll redirect based on role
+      // This will happen automatically via the protected routes
+      navigate("/");
     } catch (error) {
-      console.error('Login error:', error);
-      // Toast notification is handled in AuthContext
-    } finally {
-      setIsSubmitting(false);
+      if (error instanceof Error) {
+        setFormError(error.message);
+      } else {
+        setFormError("An unexpected error occurred. Please try again.");
+      }
     }
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
-      <Card className="w-full max-w-md">
-        <CardHeader className="space-y-1">
-          <CardTitle className="text-2xl font-bold text-center text-primary-700">
-            Parking Management System
-          </CardTitle>
-          <CardDescription className="text-center text-gray-500">
-            Enter your credentials to access your account
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
-              <Input
-                id="email"
-                type="email"
-                placeholder="your.email@example.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-                className="w-full"
-              />
-            </div>
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <Label htmlFor="password">Password</Label>
+    <div className="min-h-screen flex flex-col">
+      <Navbar />
+      
+      <PageTransition>
+        <main className="flex-grow flex items-center justify-center py-12">
+          <div className="w-full max-w-md px-4">
+            <div className="bg-white rounded-lg shadow-lg border border-gray-200 p-8">
+              <div className="text-center mb-6">
+                <motion.h1 
+                  className="text-2xl font-bold"
+                  initial={{ opacity: 0, y: -10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.3 }}
+                >
+                  Welcome Back
+                </motion.h1>
+                <motion.p 
+                  className="text-gray-600"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ delay: 0.1, duration: 0.3 }}
+                >
+                  Login to your ParkEasy account
+                </motion.p>
               </div>
-              <Input
-                id="password"
-                type="password"
-                placeholder="••••••••"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                className="w-full"
-              />
-            </div>
-            <div className="flex items-center space-x-2">
-              <Checkbox 
-                id="remember" 
-                checked={rememberMe}
-                onCheckedChange={(checked) => setRememberMe(!!checked)}
-              />
-              <Label
-                htmlFor="remember"
-                className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-              >
-                Remember me
-              </Label>
-            </div>
-            <Button 
-              type="submit" 
-              className="w-full" 
-              disabled={isSubmitting}
-            >
-              {isSubmitting ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" /> 
-                  Signing In...
-                </>
-              ) : (
-                "Sign In"
+              
+              {formError && (
+                <motion.div
+                  initial={{ opacity: 0, y: -10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="bg-red-50 text-red-500 p-3 rounded-md mb-6 text-sm"
+                >
+                  {formError}
+                </motion.div>
               )}
-            </Button>
-          </form>
-        </CardContent>
-        <CardFooter className="flex justify-center">
-          <p className="text-sm text-gray-600">
-            Don't have an account?{" "}
-            <Link to="/signup" className="font-medium text-primary-600 hover:text-primary-500">
-              Sign up
-            </Link>
-          </p>
-        </CardFooter>
-      </Card>
+              
+              <Form {...form}>
+                <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                  <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    transition={{ delay: 0.2 }}
+                  >
+                    <FormField
+                      control={form.control}
+                      name="email"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Email</FormLabel>
+                          <FormControl>
+                            <div className="relative">
+                              <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
+                              <Input
+                                placeholder="Enter your email"
+                                className="pl-10"
+                                {...field}
+                              />
+                            </div>
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </motion.div>
+                  
+                  <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    transition={{ delay: 0.3 }}
+                  >
+                    <FormField
+                      control={form.control}
+                      name="password"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Password</FormLabel>
+                          <FormControl>
+                            <div className="relative">
+                              <Key className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
+                              <Input
+                                type="password"
+                                placeholder="Enter your password"
+                                className="pl-10"
+                                {...field}
+                              />
+                            </div>
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </motion.div>
+                  
+                  <div className="flex items-center justify-between">
+                    <motion.div
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      transition={{ delay: 0.4 }}
+                    >
+                      <FormField
+                        control={form.control}
+                        name="rememberMe"
+                        render={({ field }) => (
+                          <div className="flex items-center space-x-2">
+                            <Checkbox
+                              id="rememberMe"
+                              checked={field.value}
+                              onCheckedChange={field.onChange}
+                            />
+                            <label
+                              htmlFor="rememberMe"
+                              className="text-sm text-gray-600"
+                            >
+                              Remember me
+                            </label>
+                          </div>
+                        )}
+                      />
+                    </motion.div>
+                    
+                    <motion.div
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      transition={{ delay: 0.4 }}
+                    >
+                      <Link
+                        to="/forgot-password"
+                        className="text-sm text-parking-blue hover:underline"
+                      >
+                        Forgot password?
+                      </Link>
+                    </motion.div>
+                  </div>
+                  
+                  <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    transition={{ delay: 0.5 }}
+                  >
+                    <Button type="submit" className="w-full" disabled={isLoading}>
+                      {isLoading ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Logging in...
+                        </>
+                      ) : (
+                        "Login"
+                      )}
+                    </Button>
+                  </motion.div>
+                  
+                  <motion.div 
+                    className="mt-6 text-center"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    transition={{ delay: 0.6 }}
+                  >
+                    <p className="text-sm text-gray-600">
+                      Don't have an account?{" "}
+                      <Link
+                        to="/register"
+                        className="text-parking-blue hover:underline"
+                      >
+                        Register here
+                      </Link>
+                    </p>
+                  </motion.div>
+                  
+                  <motion.div 
+                    className="mt-6"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    transition={{ delay: 0.7 }}
+                  >
+                    <Link
+                      to="/"
+                      className="inline-flex items-center text-sm text-gray-600 hover:text-parking-blue"
+                    >
+                      <ArrowLeft className="mr-2 h-4 w-4" />
+                      Back to home
+                    </Link>
+                  </motion.div>
+                </form>
+              </Form>
+            </div>
+          </div>
+        </main>
+      </PageTransition>
+      
+      <Footer />
     </div>
   );
-};
-
-export default Login;
+}

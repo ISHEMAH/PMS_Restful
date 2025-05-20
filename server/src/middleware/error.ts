@@ -4,6 +4,14 @@ import { PrismaClientKnownRequestError, PrismaClientValidationError } from '@pri
 export const errorHandler: ErrorRequestHandler = (err, req, res, next) => {
   console.error(err.stack);
 
+  // Handle JSON parsing errors
+  if (err instanceof SyntaxError && 'body' in err) {
+    return res.status(400).json({
+      error: 'Invalid JSON',
+      message: 'The request body contains invalid JSON'
+    });
+  }
+
   if (err instanceof PrismaClientKnownRequestError) {
     return res.status(400).json({
       error: 'Database error',
